@@ -1,0 +1,41 @@
+services:
+  paseo:
+    build: .
+    user: node
+    working_dir: /workspace
+    environment:
+      HOME: /home/node
+      PASEO_HOME: /home/node/.paseo
+      PASEO_LISTEN: 0.0.0.0:6767
+      PASEO_WEB_UI_ENABLED: "true"
+      PASEO_PASSWORD: ${PASEO_PASSWORD:?Set PASEO_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:3001:3001"
+      - "127.0.0.1:5173:5173"
+      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:${PASEO_PORT:-6767}:6767"
+    volumes:
+      - paseo_home:/home/node
+      - ${PASEO_CACHE:-./cache}:/home/node/.cache
+      - ${PASEO_WORKSPACE:-./workspace}:/workspace
+      - ${PASEO_CONFIG:-./config}:/home/node/.pi/agent
+      - ${PASEO_DATA:-./data}:/home/node/.paseo
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,exec,nosuid,nodev,size=${PASEO_TMP_SIZE:-12g}
+      - /run:rw,nosuid,nodev,size=${PASEO_RUN_SIZE:-1g}
+    cpus: ${PASEO_CPUS:-12}
+    mem_limit: ${PASEO_MEMORY:-20g}
+    memswap_limit: ${PASEO_MEMSWAP:-28g}
+    pids_limit: ${PASEO_PIDS:-1024}
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+volumes:
+  paseo_home:

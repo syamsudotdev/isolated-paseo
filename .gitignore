@@ -1,0 +1,16 @@
+# Ignore everything except the project files listed below.
+/*
+!/.gitignore
+!/Dockerfile
+!/compose.yaml
+!/.env.example
+!/README.md
+!/scripts/
+/scripts/*
+!/scripts/smoke-check.sh
+!/defaults/
+/defaults/*
+!/defaults/gradle.properties
+!/defaults/init.d/
+/defaults/init.d/*
+!/defaults/init.d/test-forks.gradle
