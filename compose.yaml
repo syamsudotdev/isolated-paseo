@@ -8,7 +8,13 @@ services:
       PASEO_HOME: /home/node/.paseo
       PASEO_LISTEN: 0.0.0.0:6767
       PASEO_WEB_UI_ENABLED: "true"
-      PASEO_PASSWORD: ${PASEO_PASSWORD:?Set PASEO_PASSWORD in .env}
+    env_file:
+      - ${PASEO_PASSWORD_ENV_FILE:?Set an external password file in .env}
+    secrets:
+      - source: figma-workplace-a
+        target: figma-workplace-a
+      - source: figma-workplace-b
+        target: figma-workplace-b
     ports:
       - "127.0.0.1:3000:3000"
       - "127.0.0.1:5173:5173"
@@ -35,6 +41,12 @@ services:
     stdin_open: true
     tty: true
     restart: unless-stopped
+
+secrets:
+  figma-workplace-a:
+    file: ${FIGMA_WORKPLACE_A_SECRET_FILE:?Set an external workplace A secret file in .env}
+  figma-workplace-b:
+    file: ${FIGMA_WORKPLACE_B_SECRET_FILE:?Set an external workplace B secret file in .env}
 
 volumes:
   paseo_home:

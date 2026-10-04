@@ -4,11 +4,39 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 docker compose config --quiet
 container=$(docker compose ps -q paseo)
-[[ -n "$container" ]] || { echo 'Paseo is not running.' >&2; exit 1; }
+[[ -n "$container" ]] || {
+	echo 'Paseo is not running.' >&2
+	exit 1
+}
 [[ "$(docker compose exec -T paseo id -u)" == 0 ]]
 [[ "$(docker compose exec -T paseo id -g)" == 0 ]]
-version=$(docker compose exec -T paseo pi --version)
-[[ "$version" == '1.0.0' ]] || { echo "Unexpected Pi version: $version" >&2; exit 1; }
+tool() { docker compose exec -T paseo /opt/toolchain/bin/mise -C /opt/toolchain exec -- "$@"; }
+version=$(tool pi --version)
+[[ "$version" == '1.0.2' ]] || {
+	echo "Unexpected Pi version: $version" >&2
+	exit 1
+}
+[[ "$(tool node --version)" == v24.21.0 ]]
+[[ "$(tool npm --version)" == 11.19.0 ]]
+[[ "$(tool java -version 2>&1)" == *'Temurin-25.0.4.1+1'* ]]
+[[ "$(tool go version)" == 'go version go1.27.1 '* ]]
+[[ "$(tool rustc --version)" == 'rustc 1.99.0 '* ]]
+[[ "$(tool rustup --version)" == 'rustup 1.29.1 '* ]]
+[[ "$(tool uv --version)" == 'uv 0.12.23'* ]]
+# shellcheck disable=SC2016 # Expand these values inside the container.
+tool sh -c 'test "$(locale charmap)" = UTF-8 && test -n "$JAVA_HOME" && test -d "$JAVA_HOME" && test "$ANDROID_HOME" = /opt/toolchain/android-sdk && test -w "$HOME/.cache" && test -w "$HOME/.local/share/toolchain"'
+# shellcheck disable=SC2016 # Expand HOME inside the container.
+tool sh -c 'test -f "$HOME/.pi/agent/AGENTS.md" && test -f "$HOME/.pi/agent/mcp.json" && test -f "$HOME/.pi/agent/extensions/paseo-supervision.ts" && test -f "$HOME/.agents/skills/android-cli/SKILL.md"'
+tool sh -c 'grep -qx "Pkg.Revision=23.0" /opt/toolchain/mise/installs/android-sdk/23.0/cmdline-tools/23.0/source.properties'
+[[ "$(docker compose exec -T paseo /opt/toolchain/bin/android --version)" == 1.0.16500706 ]]
+# shellcheck disable=SC2016 # Expand ANDROID_HOME inside the container.
+tool sh -c 'test -f "$ANDROID_HOME/platforms/android-37.2/source.properties" && test -f "$ANDROID_HOME/platform-tools/source.properties" && test -f "$ANDROID_HOME/build-tools/37.0.0/source.properties"'
+# shellcheck disable=SC2016 # Expand ANDROID_HOME inside the container.
+tool sh -c 'grep -qx "Pkg.Revision=37.0.1" "$ANDROID_HOME/platform-tools/source.properties" && grep -qx "Pkg.Revision=37.0.0" "$ANDROID_HOME/build-tools/37.0.0/source.properties" && grep -qx "Pkg.Revision=1" "$ANDROID_HOME/platforms/android-37.2/source.properties"'
+[[ "$(tool gh --version)" == 'gh version 2.102.0'* ]]
+[[ "$(tool az version --output json | docker compose exec -T paseo node -e 'let s="";process.stdin.on("data",c=>s+=c).on("end",()=>console.log(JSON.parse(s)["azure-cli"]))')" == 2.90.0 ]]
+[[ "$(tool fd --version)" == 'fd 10.5.0' ]]
+[[ "$(tool rg --version)" == 'ripgrep 15.2.0'* ]]
 docker compose exec -T paseo sh -c 'for path in /home/node /home/node/.cache /home/node/.pi/agent /home/node/.paseo /workspace; do test -w "$path" || exit 1; done'
 docker compose exec -T paseo sh -c 'test -d "$HOME/.gradle" && test -w "$HOME/.gradle" && test -f "$HOME/.gradle/gradle.properties" && test -r "$HOME/.gradle/gradle.properties"'
 docker compose exec -T paseo sh -c 'test -d "$HOME/.gradle/init.d" && test -w "$HOME/.gradle/init.d" && test -f "$HOME/.gradle/init.d/test-forks.gradle" && test -r "$HOME/.gradle/init.d/test-forks.gradle"'
@@ -29,6 +57,8 @@ process.stdin.on("end", () => {
   }
   const home = service.volumes.find(m => m.target === "/home/node");
   if (service.volumes.length !== 5 || home?.type !== "volume" || home.source !== "paseo_home" || home.volume?.nocopy) throw new Error("Invalid home volume or mount scope");
+  const secrets = service.secrets || [];
+  if (secrets.length !== 2 || !["figma-workplace-a", "figma-workplace-b"].every(name => secrets.some(s => s.target === name))) throw new Error("Unexpected secrets");
   const daemon = service.ports.find(p => p.target === 6767);
   if (!daemon?.published) throw new Error("Missing daemon port");
   console.log(JSON.stringify({ binds, home: config.volumes.paseo_home.name, port: String(daemon.published) }));
@@ -65,7 +95,11 @@ process.stdin.on("end", () => {
     const mount = c.Mounts.find(m => m.Destination === target);
     check(mount?.Type === "bind" && mount.RW && mount.Source === source, "Unexpected bind: " + target);
   }
-  const targets = ["/home/node", ...Object.keys(expected.binds), "/tmp", "/run"];
+  for (const name of ["figma-workplace-a", "figma-workplace-b"]) {
+    const mount = c.Mounts.find(m => m.Destination === "/run/secrets/" + name);
+    check(mount?.Type === "bind" && !mount.RW, "Invalid secret mount: " + name);
+  }
+  const targets = ["/home/node", ...Object.keys(expected.binds), "/tmp", "/run", "/run/secrets/figma-workplace-a", "/run/secrets/figma-workplace-b"];
   check(c.Mounts.every(m => targets.includes(m.Destination)), "Unexpected mount destination");
   check(Object.keys(h.Tmpfs || {}).length === 2, "Unexpected tmpfs mounts");
   for (const target of ["/tmp", "/run"]) {

@@ -1,255 +1,41 @@
 # Isolated Paseo with Pi
 
-This setup installs Paseo `0.10.2` and Pi `1.0.0` on `node:24-bookworm-slim`.
-Node 24 meets Pi's requirement of Node >=22.19.
-Paseo uses its native Pi provider to connect to Pi.
-The Paseo server package includes the web user interface (UI).
-`tini` runs as process 1 and starts `paseo daemon run`.
+This image selects the toolchain in `defaults/mise.toml` and `defaults/mise.lock`. It installs locked npm applications from `defaults/apps/package-lock.json`. The selected Pi version is 1.0.2. The selected Paseo version is 0.10.3. The image has one repository, one container, and two Figma MCP account entries.
 
-## Start
+## Private host setup
 
-The host is the computer that runs Docker.
-The defaults allow 12 CPUs and 20 GiB of memory.
-One GiB equals 1073741824 bytes.
-The 28 GiB memory-plus-swap limit includes memory and swap.
-It does not provide 28 GiB of additional swap.
-Swap is memory storage on disk.
-Its availability depends on the host.
+Use rootless Docker. Keep the named `paseo_home` volume and the existing `workspace`, `cache`, `config`, and `data` bind mounts. The root filesystem is read-only. The container has no Docker socket, no added capabilities, and no privileged mode. Published ports use the host loopback interface.
 
-1. Install Docker with Docker Compose on the host.
-2. Check that the host has sufficient resources.
-3. Run the following commands from this project directory.
-4. Copy `.env.example` to `.env`.
-5. Replace `PASEO_PASSWORD` with a long random password.
-6. Reduce the limits in `.env` if necessary.
-7. Create the four host directories.
+Create `~/.config/isolated-paseo/secrets` with mode 0700. Copy the three examples in `defaults/secrets/` to that directory without the `.example` suffix. Put real values in those files. Set each file to mode 0600. Use exactly one of `FIGMA_API_KEY` and `FIGMA_OAUTH_TOKEN` in each Figma file. Both account credentials are accessible to every agent in this container. Account names do not isolate credentials.
 
-```sh
-cp .env.example .env
-# Edit .env. Replace PASEO_PASSWORD with a long random password.
-mkdir -p workspace cache config data
-```
+Copy `.env.example` to `.env`. Set absolute private file paths for `PASEO_PASSWORD_ENV_FILE`, `FIGMA_WORKPLACE_A_SECRET_FILE`, and `FIGMA_WORKPLACE_B_SECRET_FILE`. Set `.env` to mode 0600. The password is still visible to host operators who can inspect container environment variables. Do not put credential values in `.env` or the repository. Set the four bind paths to the existing host directories before replacing an installation.
 
-This configuration targets rootless Docker.
-It runs with container user ID (UID) and group ID (GID) `0:0`.
-Rootless Docker maps these IDs to the host user that runs the Docker daemon.
-Do not use this configuration with a rootful Docker daemon.
-A bind mount makes a host directory available at a container path.
-If you change the bind mount paths in `.env`, use those host directories instead.
+Run `docker compose config --quiet` on the host. Do not print a resolved Compose configuration with credentials. Check rootless Docker access, file permissions, and real bind path identities. Back up Pi, Paseo, GitHub CLI, Azure CLI, and home state before deployment. Preserve the previous image and configuration for rollback. Then build the image with `docker compose build`. Do not recreate a live container until deployment is approved.
 
-1. Check that the same host user owns all four host directories.
+After approval, use `docker compose up -d` and `bash scripts/smoke-check.sh`. Do not run `docker compose down -v`. A container recreation interrupts running agents, although saved state persists in the mounts. The Docker host must verify image installation and actual runtime behavior. An Android project must pass its Gradle wrapper checks with Java 25 before Android build compatibility is claimed.
 
-```sh
-ls -ldn workspace cache config data
-```
+## Defaults and migration
 
-Keep `.env` private.
-The `.gitignore` rules allow Git to track only the approved project files.
-These rules exclude local credentials and state directories.
-This setup adds no API credentials.
+The entrypoint installs missing reviewed defaults into `/home/node/.pi/agent`, `/home/node/.agents/skills`, and `/home/node/.gradle`. It does not replace existing files. It merges the two Figma entries into an existing MCP configuration without replacing other servers. It preserves authentication, sessions, agent records, models, and supervision runtime state. The supervision extension still activates only for its specified parent agent. Existing customized files need manual review and explicit replacement if you want template updates. In particular, the old supervision `monitor.mjs` imports Paseo 0.10.2 from the old global npm path and rejects 0.10.3. Before deployment, back up `config/supervision/monitor.mjs` and `config/supervision/delivery.test.mjs`. Compare each file with `defaults/pi/supervision/`. Install the reviewed versions only after explicit operator approval. Do not replace `config/supervision/state/` or the restricted extension. Inspect and merge `config/settings.json` and `config/mcp.json` instead of overwriting them. The checked-in skill set contains text assets only. The upstream binary trace processor is not copied.
 
-1. Validate the Compose configuration.
-2. Build the image.
-3. Start the service.
-4. Run the smoke check.
+Pi starts the two Figma MCP servers with `--no-telemetry`, `--skip-image-downloads`, and an explicit `--env` path. The account secret files are mounted at `/run/secrets/figma-workplace-a` and `/run/secrets/figma-workplace-b`. This does not prove Figma authorization. Validate each account using a known file that account can read. The Android CLI must run with `--no-metrics` on its first invocation. Do not run `android init` while `/root` is read-only.
 
-```sh
-docker compose config --quiet
-docker compose build
-docker compose up -d
-bash scripts/smoke-check.sh
-```
+The selected Android SDK includes command-line tools 23.0, platform tools, Android platform 37.2, and build tools 37.0.0. No Android Studio, emulator, system image, or global Gradle is installed. Run each project's Gradle wrapper.
 
-1. Open `http://127.0.0.1:6767` on the Docker host.
-2. Select the local UI direct connection.
-3. Enter the password from `.env`.
-4. Use `PASEO_PORT` instead of 6767 if you changed the daemon port.
+## Host user service
 
-The ports use loopback, the host's local-only network interface.
-Ports 3000, 5173, and 8080 support workspace applications.
-Port 6767 supports Paseo by default.
-These ports can conflict with other host services.
-Start application servers on `0.0.0.0` inside the container to make them accessible through the published ports.
-The setup excludes port 19432, fixed host mappings, ADB settings, and Plannotator settings.
+The unit template is `defaults/systemd/isolated-paseo.service`. Its private environment template is `defaults/systemd/service.env.example`. Verify that host `/usr/bin/docker`, Compose, rootless Docker access, the actual `cf tunnels run` executable, the Cloudflare credential location, and mise shims work without shell activation. Configure `DOCKER_HOST` when the rootless daemon requires it. Use absolute values in `service.env`. The tunnel UUID is an identifier, not a credential.
 
-## State and login
+Install the unit into `~/.config/systemd/user` only after separate deployment approval. Do not enable or start it without that approval. The unit couples container and tunnel lifetimes: stopping it runs `docker compose down`; tunnel failure can interrupt agents during recovery. Five failed starts hit the configured limit. Validate the unit with host `systemd-analyze --user verify` and test startup and recovery under the host user manager. Changing lingering needs separate approval.
 
-A named volume is storage that Docker manages separately from the container.
-It retains files after the container stops.
+## Acceptance and rollback
 
-| Storage | Container path | Purpose |
-| --- | --- | --- |
-| Named `paseo_home` volume | `/home/node` | General home files |
-| `./cache` bind mount | `/home/node/.cache` | Cache, including npm cache |
-| `./workspace` bind mount | `/workspace` | Project files |
-| `./config` bind mount | `/home/node/.pi/agent` | Pi settings, credentials, and sessions |
-| `./data` bind mount | `/home/node/.paseo` | Paseo state |
+Container-side syntax, isolated dependency, and synthetic-secret checks are not substitutes for Docker and host checks. On the host, run the smoke check, inspect actual mounts and daemon environment, verify the selected CLI and SDK versions, test a new Paseo agent's environment, and resume an existing Pi session. Verify provider login, saved agents, both Figma accounts, and actual Cloudflare tunnel operation. Preserve initial state, exact actions, expected observable results, and failure conditions for each manual check. Record actual results.
 
-These paths are not OpenCode configuration paths.
-You can change each bind mount path in `.env`.
-Bind mounts hide the image directories at their container paths.
-Host directory permissions must allow the rootless Docker host user to write.
+Before each host test, record the active image ID and the existing session and agent counts. After an approved recreation, run `docker compose config --quiet`, `bash scripts/smoke-check.sh`, and `docker compose exec -T paseo /opt/toolchain/bin/mise -C /opt/toolchain exec -- sh -c 'test -d "$JAVA_HOME" && test "$ANDROID_HOME" = /opt/toolchain/android-sdk && command -v java && command -v cargo'`. A failure is any missing key, wrong path, failed smoke assertion, or lost saved session. Start a disposable new agent. Confirm that it can run `java -version`, `cargo --version`, and `pi --version` without shell activation. Record output and stop the disposable agent. For each Figma entry, request the same known permitted file through the MCP connection and record whether it returns that file. Any authorization error or wrong account response is a failure. Do not print token values. On the host, check `systemd-analyze --user verify ~/.config/systemd/user/isolated-paseo.service`. After separate activation approval, start and stop the user service, verify rootless Docker access and `cf tunnels run`, and record the container and tunnel status. Failure includes an unavailable daemon, failed tunnel, or unexpected container shutdown. Check logout and reboot only if lingering is approved.
 
-The image prepares root-owned home directories for rootless Docker.
-Docker copies image files into a new, empty named home volume.
+For rollback, stop the new service only with deployment approval. Restore the previous Compose configuration and image. Run `docker compose up -d` without `-v`. Do not replace or delete private volumes or host state. Verify login and saved sessions again.
 
-1. Check ownership after the first start.
-2. Check write access to the listed paths.
-3. Start Pi interactively as the configured container user.
+## Known installation gates
 
-```sh
-docker compose exec -T paseo sh -c 'id; ls -ldn /home/node /home/node/.cache /home/node/.pi/agent /home/node/.paseo; for path in /home/node /home/node/.cache /home/node/.pi/agent /home/node/.paseo /workspace; do test -w "$path" || exit 1; done'
-docker compose exec paseo pi
-```
-
-1. Complete Pi's interactive login procedure.
-2. Work in `/workspace`.
-3. Create a session to test saved state.
-4. Run `docker compose restart`.
-5. Check that login and the saved session still work.
-
-`docker compose down` preserves saved state.
-**Warning:** `docker compose down -v` deletes the named home volume and its files.
-It does not delete the host bind mount directories.
-
-### Manual migration from the previous layout
-
-The previous image used `/home/paseo`.
-This image uses `/home/node` and separate Pi and Paseo bind mounts.
-The setup does not migrate existing state automatically.
-
-**Warning:** Do not delete or reuse the old volume before checking its contents and ownership.
-Keep the backup until login and saved-session checks pass.
-
-1. Stop the old service.
-2. Locate its actual named volume.
-3. Back up that volume.
-4. Back up existing host state.
-5. Copy the old `.pi/agent` contents into the configured `config` host directory.
-6. Copy the old `.paseo` contents into the configured `data` host directory.
-7. Copy required cache files into `cache`.
-8. Preserve other required home files separately.
-9. Check ownership of the copied files.
-10. Check permissions of the copied files.
-11. Verify login with the new setup.
-12. Verify the saved sessions before deleting any old state.
-
-## Gradle settings
-
-The image installs `defaults/gradle.properties` at `/home/node/.gradle/gradle.properties`.
-It copies the original environment's three settings but omits `-Djava.io.tmpdir`.
-Java therefore uses its default temporary directory.
-Docker copies this root-owned file into a new, empty named home volume.
-Rebuilding does not update an existing home volume.
-The smoke check requires a readable settings file and a writable `.gradle` directory.
-It permits customized settings.
-
-**Warning:** The following command overwrites existing settings.
-Do not replace personalized settings unless you intend to discard them.
-
-1. Back up existing settings before replacement.
-2. Check the backup.
-3. Explicitly choose to replace the settings.
-4. Run the following command from this project directory.
-
-```sh
-docker compose exec -T paseo sh -c 'mkdir -p "$HOME/.gradle" && cat > "$HOME/.gradle/gradle.properties"' < defaults/gradle.properties
-```
-
-The command creates `.gradle` and writes the file as the configured rootless-container user.
-The Java heap stores application objects.
-Gradle has a 10 GiB heap limit.
-The Kotlin daemon has a 4 GiB heap limit.
-Java metaspace stores class metadata.
-Each process has a 1 GiB metaspace limit.
-Native memory, Pi, and Paseo need additional memory within the container's 20 GiB limit.
-Adjust these settings or the container memory limits for your workload.
-This setup adds configuration only.
-It does not install Java or Gradle.
-No Gradle build has been verified.
-
-### Test process settings
-
-The image installs the unchanged `defaults/init.d/test-forks.gradle` at `/home/node/.gradle/init.d/test-forks.gradle`.
-Gradle automatically loads scripts in the user's `.gradle/init.d` directory.
-This script sets `maxParallelForks = 1` and `forkEvery = 2` for each `Test` task.
-Each task uses at most one parallel test process.
-It replaces that process after two test classes.
-
-Docker copies the script into a new, empty named home volume.
-An existing volume remains unchanged.
-
-**Warning:** The following command overwrites an existing script at the target path.
-
-1. Back up any existing script at that path.
-2. Check the backup.
-3. Explicitly choose to install or replace the script.
-4. Run the following command from this project directory.
-
-```sh
-docker compose exec -T paseo sh -c 'mkdir -p "$HOME/.gradle/init.d" && cat > "$HOME/.gradle/init.d/test-forks.gradle"' < defaults/init.d/test-forks.gradle
-```
-
-The command writes as the configured rootless-container user.
-The smoke check requires a readable script and a writable `init.d` directory.
-It permits customized script contents.
-Test execution remains unverified.
-
-## Isolation limits
-
-The image filesystem is read-only.
-The home volume and four host bind mounts remain writable.
-The `/tmp` and `/run` paths also remain writable.
-The container drops all Linux capabilities.
-It enables `no-new-privileges` to prevent processes from gaining additional privileges.
-It provides an interactive terminal.
-
-A tmpfs is a temporary filesystem backed by memory.
-Its size limit is a maximum, not reserved memory.
-CPU, memory, total memory-plus-swap, process count, and tmpfs sizes have configurable finite limits.
-Only `/tmp` explicitly enables execution.
-
-The `/tmp` default is 12 GiB.
-This value matches capacity measured in the original implementation environment, not every deployment.
-That capacity was 12884901888 bytes, not the measured free space.
-The conversion is 1 GiB = 1073741824 bytes.
-The `/run` default remains 1 GiB from the reference.
-
-The tmpfs size limits apply only to `/tmp` and `/run`.
-There is no general workspace disk quota.
-Named volumes and host bind mounts can fill their host filesystem.
-
-The setup does not mount the Docker socket.
-It does not use privileged mode or broad host mounts.
-An agent can read, change, or delete files in the mounted directories.
-Pi credentials and Paseo state are sensitive.
-Mount only the intended project.
-Outbound internet access remains enabled.
-Container isolation does not provide a complete security boundary against hostile code.
-
-## Verification status
-
-The smoke check validates Compose configuration, user and group IDs, Pi version, and write access to state paths.
-It checks actual isolation settings, exact published ports, configured bind mount sources, and resource limits.
-It also checks the HTTP root UI.
-It does not use an undocumented health endpoint.
-
-Docker is unavailable in the implementation environment.
-Build success, installed package behavior, new-volume ownership, and all runtime checks remain pending.
-RPC means remote procedure call.
-Pi login, native provider discovery, RPC behavior, and saved-session persistence remain unverified.
-
-1. Verify Pi login manually.
-2. Verify native provider discovery manually.
-3. Verify the `get_state` RPC manually.
-4. Verify saved-session persistence manually.
-
-The automated script does not include RPC or provider-inspection commands.
-Gradle build and test execution also remain unverified.
-
-## Sources
-
-- [Reference isolation setup at the selected commit](https://github.com/syamsudotdev/openchamber-isolated/tree/aa346ff3095d6a4061906174508ac3feda8454d9)
-- [Paseo source](https://github.com/getpaseo/paseo/tree/v0.10.2)
-- [Paseo Docker documentation](https://paseo.sh/docs/docker)
-- [Pi quickstart](https://pi.dev/docs/latest/quickstart)
+The `fffind` and `ffgrep` implementation and an authoritative RTK skill source have not been identified. Do not replace them with other search commands or claim they work. Azure CLI 2.90.0 and its isolated Python 3.14.8 environment passed an isolated version check. Rust 1.99.0 installed with rustup 1.29.1 in a temporary installation. Its behavior with image-managed read-only rustup state, and the full image build, remain host acceptance gates until verified. The runtime image keeps image-managed Rust toolchains under `/opt/toolchain/rustup`; do not update rustup inside the running read-only container.
