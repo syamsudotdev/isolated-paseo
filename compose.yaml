@@ -1,7 +1,7 @@
 services:
   paseo:
     build: .
-    user: node
+    user: "0:0"
     working_dir: /workspace
     environment:
       HOME: /home/node
@@ -11,7 +11,6 @@ services:
       PASEO_PASSWORD: ${PASEO_PASSWORD:?Set PASEO_PASSWORD in .env}
     ports:
       - "127.0.0.1:3000:3000"
-      - "127.0.0.1:3001:3001"
       - "127.0.0.1:5173:5173"
       - "127.0.0.1:8080:8080"
       - "127.0.0.1:${PASEO_PORT:-6767}:6767"

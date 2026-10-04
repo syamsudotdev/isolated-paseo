@@ -30,21 +30,17 @@ cp .env.example .env
 mkdir -p workspace cache config data
 ```
 
-The service runs as the `node` user.
-Its user ID (UID) and group ID (GID) are `1000:1000`.
+This configuration targets rootless Docker.
+It runs with container user ID (UID) and group ID (GID) `0:0`.
+Rootless Docker maps these IDs to the host user that runs the Docker daemon.
+Do not use this configuration with a rootful Docker daemon.
 A bind mount makes a host directory available at a container path.
 If you change the bind mount paths in `.env`, use those host directories instead.
 
-**Warning:** The ownership command below changes the owners of the four directories.
-Use it only for new, empty directories.
-Do not recursively change ownership of existing files without checking their contents and users.
-
-1. Check ownership of all four host directories.
-2. Set their owner to `1000:1000` only if they are new and empty.
+1. Check that the same host user owns all four host directories.
 
 ```sh
 ls -ldn workspace cache config data
-sudo chown 1000:1000 workspace cache config data
 ```
 
 Keep `.env` private.
@@ -70,7 +66,7 @@ bash scripts/smoke-check.sh
 4. Use `PASEO_PORT` instead of 6767 if you changed the daemon port.
 
 The ports use loopback, the host's local-only network interface.
-Ports 3000, 3001, 5173, and 8080 support workspace applications.
+Ports 3000, 5173, and 8080 support workspace applications.
 Port 6767 supports Paseo by default.
 These ports can conflict with other host services.
 Start application servers on `0.0.0.0` inside the container to make them accessible through the published ports.
@@ -92,14 +88,14 @@ It retains files after the container stops.
 These paths are not OpenCode configuration paths.
 You can change each bind mount path in `.env`.
 Bind mounts hide the image directories at their container paths.
-Host directory permissions must allow user and group IDs `1000:1000` to write.
+Host directory permissions must allow the rootless Docker host user to write.
 
-The image prepares home directories owned by the `node` user.
+The image prepares root-owned home directories for rootless Docker.
 Docker copies image files into a new, empty named home volume.
 
 1. Check ownership after the first start.
 2. Check write access to the listed paths.
-3. Start Pi interactively as the configured `node` user.
+3. Start Pi interactively as the configured container user.
 
 ```sh
 docker compose exec -T paseo sh -c 'id; ls -ldn /home/node /home/node/.cache /home/node/.pi/agent /home/node/.paseo; for path in /home/node /home/node/.cache /home/node/.pi/agent /home/node/.paseo /workspace; do test -w "$path" || exit 1; done'
@@ -138,48 +134,18 @@ Keep the backup until login and saved-session checks pass.
 11. Verify login with the new setup.
 12. Verify the saved sessions before deleting any old state.
 
-### Existing home volume owned by root
-
-The root user has user ID 0.
-Image build-time ownership does not repair an existing named volume.
-The repair below changes ownership only inside the named home volume.
-It excludes the nested host bind mounts.
-A Linux capability is a kernel permission.
-This repair temporarily adds capabilities to change ownership.
-
-**Warning:** Use this repair only for a home volume owned by root.
-Inspect the volume before changing ownership.
-The repair does not fix host `cache`, `config`, or `data` ownership.
-It does not repair the workspace.
-
-1. Stop the service.
-2. Run the explicit home ownership repair.
-3. Start the service again.
-
-```sh
-docker compose stop paseo
-docker compose run --rm --no-deps --user 0:0 --cap-add CHOWN --cap-add DAC_OVERRIDE --entrypoint sh paseo -c 'find /home/node -path /home/node/.cache -prune -o -path /home/node/.pi/agent -prune -o -path /home/node/.paseo -prune -o -exec chown -h 1000:1000 {} +'
-docker compose up -d
-```
-
-1. Inspect host directory ownership separately.
-2. Correct host ownership only after checking the affected files.
-3. Repeat the ownership checks above.
-4. Repeat the write-access checks above.
-
 ## Gradle settings
 
 The image installs `defaults/gradle.properties` at `/home/node/.gradle/gradle.properties`.
 It copies the original environment's three settings but omits `-Djava.io.tmpdir`.
 Java therefore uses its default temporary directory.
-Docker copies this node-owned file into a new, empty named home volume.
+Docker copies this root-owned file into a new, empty named home volume.
 Rebuilding does not update an existing home volume.
 The smoke check requires a readable settings file and a writable `.gradle` directory.
 It permits customized settings.
 
 **Warning:** The following command overwrites existing settings.
 Do not replace personalized settings unless you intend to discard them.
-If ownership prevents writing, repair home ownership first.
 
 1. Back up existing settings before replacement.
 2. Check the backup.
@@ -190,7 +156,7 @@ If ownership prevents writing, repair home ownership first.
 docker compose exec -T paseo sh -c 'mkdir -p "$HOME/.gradle" && cat > "$HOME/.gradle/gradle.properties"' < defaults/gradle.properties
 ```
 
-The command creates `.gradle` and writes the file as the configured `node` user.
+The command creates `.gradle` and writes the file as the configured rootless-container user.
 The Java heap stores application objects.
 Gradle has a 10 GiB heap limit.
 The Kotlin daemon has a 4 GiB heap limit.
@@ -224,7 +190,7 @@ An existing volume remains unchanged.
 docker compose exec -T paseo sh -c 'mkdir -p "$HOME/.gradle/init.d" && cat > "$HOME/.gradle/init.d/test-forks.gradle"' < defaults/init.d/test-forks.gradle
 ```
 
-The command writes as the configured `node` user.
+The command writes as the configured rootless-container user.
 The smoke check requires a readable script and a writable `init.d` directory.
 It permits customized script contents.
 Test execution remains unverified.

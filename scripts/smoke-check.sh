@@ -5,8 +5,8 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 docker compose config --quiet
 container=$(docker compose ps -q paseo)
 [[ -n "$container" ]] || { echo 'Paseo is not running.' >&2; exit 1; }
-[[ "$(docker compose exec -T paseo id -u)" == 1000 ]]
-[[ "$(docker compose exec -T paseo id -g)" == 1000 ]]
+[[ "$(docker compose exec -T paseo id -u)" == 0 ]]
+[[ "$(docker compose exec -T paseo id -g)" == 0 ]]
 version=$(docker compose exec -T paseo pi --version)
 [[ "$version" == '1.0.0' ]] || { echo "Unexpected Pi version: $version" >&2; exit 1; }
 docker compose exec -T paseo sh -c 'for path in /home/node /home/node/.cache /home/node/.pi/agent /home/node/.paseo /workspace; do test -w "$path" || exit 1; done'
@@ -43,7 +43,7 @@ process.stdin.on("end", () => {
   const h = c.HostConfig;
   const check = (ok, message) => { if (!ok) throw new Error(message); };
   check(c.State.Running, "Container is not running");
-  check(c.Config.User === "node", "Unexpected configured user");
+  check(c.Config.User === "0:0", "Unexpected configured user");
   check(c.Config.WorkingDir === "/workspace", "Unexpected working directory");
   check(c.Config.OpenStdin && c.Config.Tty, "Missing interactive terminal");
   check(h.ReadonlyRootfs, "Root filesystem is writable");
@@ -51,8 +51,8 @@ process.stdin.on("end", () => {
   check(h.CapDrop?.includes("ALL") && !h.CapAdd?.length, "Unexpected capabilities");
   check(h.SecurityOpt?.some(x => /^no-new-privileges(?::true)?$/.test(x)), "Missing no-new-privileges");
   check(h.Memory > 0 && h.MemorySwap >= h.Memory && h.NanoCpus > 0 && h.PidsLimit > 0, "Invalid resource limits");
-  const ports = { "3000/tcp": "3000", "3001/tcp": "3001", "5173/tcp": "5173", "8080/tcp": "8080", "6767/tcp": expected.port };
-  check(Object.keys(h.PortBindings || {}).length === 5, "Unexpected published ports");
+  const ports = { "3000/tcp": "3000", "5173/tcp": "5173", "8080/tcp": "8080", "6767/tcp": expected.port };
+  check(Object.keys(h.PortBindings || {}).length === 4, "Unexpected published ports");
   for (const [port, host] of Object.entries(ports)) {
     const bindings = h.PortBindings[port];
     check(bindings?.length === 1 && bindings[0].HostIp === "127.0.0.1" && bindings[0].HostPort === host, "Unexpected binding: " + port);

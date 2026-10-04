@@ -11,18 +11,18 @@ ENV HOME=/home/node \
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        bash ca-certificates curl git jq openssh-client python3 build-essential ripgrep tini \
+        bash ca-certificates curl git jq openssh-client procps=2:4.0.2-3 python3 build-essential ripgrep tini \
     && rm -rf /var/lib/apt/lists/* \
     && npm install -g @getpaseo/cli@0.10.2 \
     && npm install -g --ignore-scripts @earendil-works/pi-coding-agent@1.0.0 \
     && mkdir -p /home/node/.paseo /home/node/.pi/agent /home/node/.cache \
         /home/node/.config /home/node/.local/share /home/node/.local/state /home/node/.gradle/init.d \
-    && chown -R 1000:1000 /home/node
+    && chown -R 0:0 /home/node
 
-COPY --chown=1000:1000 defaults/gradle.properties /home/node/.gradle/gradle.properties
-COPY --chown=1000:1000 defaults/init.d/test-forks.gradle /home/node/.gradle/init.d/test-forks.gradle
+COPY --chown=0:0 defaults/gradle.properties /home/node/.gradle/gradle.properties
+COPY --chown=0:0 defaults/init.d/test-forks.gradle /home/node/.gradle/init.d/test-forks.gradle
 
-USER node
+USER root
 WORKDIR /workspace
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["paseo", "daemon", "run"]
