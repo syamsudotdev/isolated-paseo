@@ -22,6 +22,10 @@ test('mounts any number of named Figma files read-only without per-account varia
       await writeFile(join(figma, `${name}.env`), 'FIGMA_API_KEY=synthetic-test-only\n', { mode: 0o600 });
       const config = JSON.parse(execFileSync('docker', [...args, '--format', 'json'], { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }));
       const service = config.services.paseo;
+      assert.equal(service.environment.PASEO_HOSTNAMES, '', 'Unset hostnames must preserve default host protection');
+      const hostnames = 'paseo.example.test';
+      const configured = JSON.parse(execFileSync('docker', [...args, '--format', 'json'], { env: { ...env, PASEO_HOSTNAMES: hostnames }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }));
+      assert.equal(configured.services.paseo.environment.PASEO_HOSTNAMES, hostnames, 'Compose must forward the supplied hostname without allowing all hosts');
       const mount = service.volumes.find(m => m.target === '/run/secrets/figma');
       assert.ok(mount, 'Figma directory mount is missing');
       assert.equal(mount.type, 'bind');

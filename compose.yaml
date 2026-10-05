@@ -7,6 +7,7 @@ services:
       HOME: /home/node
       PASEO_HOME: /home/node/.paseo
       PASEO_LISTEN: 0.0.0.0:6767
+      PASEO_HOSTNAMES: ${PASEO_HOSTNAMES:-}
       PASEO_WEB_UI_ENABLED: "true"
     env_file:
       - ${PASEO_PASSWORD_ENV_FILE:?Set an external password file in .env}

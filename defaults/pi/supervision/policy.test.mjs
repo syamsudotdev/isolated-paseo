@@ -29,13 +29,17 @@ test('same silence episode is advised once; exposes repeated advisory flooding',
 });
 test('role metadata is carried unchanged; exposes missing or invented specialist identity', () => {
   const state = assess({ ...agent, provider: 'pi', title: 'Reviewer — bounded audit',
-    labels: { 'paseo-slim.role': 'reviewer' }, model: 'configured-model',
+    labels: { 'paseo.role': 'reviewer' }, model: 'configured-model',
     runtimeInfo: { model: 'effective-model' } }, [], start + 30_000);
   assert.deepEqual({ role: state.role, title: state.title, agent: state.agent, model: state.model },
     { role: 'reviewer', title: 'Reviewer — bounded audit', agent: 'pi', model: 'effective-model' });
   const unknown = assess(agent, [], start + 30_000);
   assert.deepEqual([unknown.role, unknown.title, unknown.agent, unknown.model],
     ['Unknown', 'Unknown', 'Unknown', 'Unknown']);
+});
+test('legacy-only role metadata is Unknown; exposes legacy label fallback', () => {
+  const legacyOnly = { id: 'legacy-child', labels: { 'paseo-slim.role': 'reviewer' } };
+  assert.equal(assess(legacyOnly, [], start).role, 'Unknown');
 });
 test('direction review at three minutes; exposes absent periodic review', () => {
   const state = { id: 'child', turnId: 'run-1', status: 'running', observation: 'healthy', startedAt: start, suspectedStall: false };

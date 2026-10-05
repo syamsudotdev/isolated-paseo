@@ -49,6 +49,8 @@ RUN /opt/toolchain/bin/mise -C /opt/toolchain exec -- sh -c 'cd /opt/toolchain/a
 COPY defaults/ /opt/toolchain/defaults/
 # Startup initializes these launchers in writable Cargo storage before mise checks Rust.
 RUN ln -sfnT /home/node/.local/share/toolchain/cargo/bin /opt/toolchain/mise/installs/rust/1.99.0 \
+    && ln -s "$(/opt/toolchain/bin/mise -C /opt/toolchain which fd)" /opt/toolchain/bin/fd \
+    && ln -s "$(/opt/toolchain/bin/mise -C /opt/toolchain which rg)" /opt/toolchain/bin/rg \
     && chown -R 0:0 /home/node
 ENV CARGO_HOME=/home/node/.local/share/toolchain/cargo \
     PATH=/opt/toolchain/bin:/opt/toolchain/apps/node_modules/.bin:/opt/toolchain/android-sdk/platform-tools:/opt/toolchain/android-sdk/cmdline-tools/23.0/bin:/opt/toolchain/android-sdk/build-tools/37.0.0:$PATH

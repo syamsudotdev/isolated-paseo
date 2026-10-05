@@ -1,0 +1,43 @@
+{
+  "daemon": {
+    "agentProfiles": [
+      { "id": "scout", "name": "scout", "provider": "pi-scout", "model": "openai/gpt-6-luna", "thinkingOptionId": "low", "notes": "Read-only local discovery. Native command binds scout instructions and inspection tools." },
+      { "id": "researcher", "name": "researcher", "provider": "pi-researcher", "model": "openai/gpt-6-luna", "thinkingOptionId": "max", "notes": "Read-only documentation and dependency research. Local inspection only until approved existing web tools are explicitly configured." },
+      { "id": "worker", "name": "worker", "provider": "pi-worker", "model": "openai/gpt-6.1-sol", "thinkingOptionId": "low", "notes": "One approved bounded writer. Targeted checks only. Parent owns six total normal attempts." },
+      { "id": "reviewer", "name": "reviewer", "provider": "pi-reviewer", "model": "openai/gpt-6.1-sol", "thinkingOptionId": "medium", "notes": "Independent read-only revision and diff review. Retain for compatible follow-ups." },
+      { "id": "oracle", "name": "oracle", "provider": "pi-oracle", "model": "openai/gpt-6.1-sol", "thinkingOptionId": "high", "notes": "Read-only diagnosis and technical judgment. Retain for compatible follow-ups. One diagnosis after normal worker exhaustion." },
+      { "id": "worker-recovery", "name": "worker-recovery", "provider": "pi-worker-recovery", "model": "openai/gpt-6.1-sol", "thinkingOptionId": "low", "notes": "Bounded recovery writer after oracle diagnosis. Parent owns four total recovery attempts." }
+    ]
+  },
+  "agents": {
+    "providers": {
+      "pi": {
+        "command": ["pi", "--extension", "/opt/toolchain/apps/node_modules/@ff-labs/pi-fff/src/index.ts", "--fff-mode", "tools-only", "--append-system-prompt", "/home/node/.pi/agent/roles/orchestrator.md"]
+      },
+      "pi-scout": {
+        "extends": "pi", "label": "scout",
+        "command": ["pi", "--no-extensions", "--extension", "/opt/toolchain/apps/node_modules/@ff-labs/pi-fff/src/index.ts", "--fff-mode", "tools-only", "--tools", "read,grep,find,ls,fffind,ffgrep", "--append-system-prompt", "Assigned role: scout. Read the Shared contract and scout section in /home/node/.pi/agent/roles/specialists.md before work. Perform only the assigned task. Do not delegate."]
+      },
+      "pi-researcher": {
+        "extends": "pi", "label": "researcher",
+        "command": ["pi", "--no-extensions", "--extension", "/opt/toolchain/apps/node_modules/@ff-labs/pi-fff/src/index.ts", "--fff-mode", "tools-only", "--tools", "read,grep,find,ls,fffind,ffgrep", "--append-system-prompt", "Assigned role: researcher. Read the Shared contract and researcher section in /home/node/.pi/agent/roles/specialists.md before work. External web tools are unavailable in this launch. Report that gap. Perform only the assigned task. Do not delegate."]
+      },
+      "pi-worker": {
+        "extends": "pi", "label": "worker",
+        "command": ["pi", "--no-extensions", "--extension", "/opt/toolchain/apps/node_modules/@ff-labs/pi-fff/src/index.ts", "--extension", "/opt/toolchain/apps/node_modules/pi-lens/dist/index.js", "--fff-mode", "tools-only", "--tools", "read,grep,find,ls,fffind,ffgrep,edit,write,bash,lens_diagnostics,symbol_search,effective_config,project_report,module_report,read_symbol,read_enclosing,pi_lens_activate_tools,ast_grep_search,ast_grep_replace,ast_grep_outline,lsp_navigation,lens_diagnostic_mark", "--skill", "/home/node/.agents/skills/rtk", "--skill", "/opt/toolchain/apps/node_modules/pi-lens/skills", "--append-system-prompt", "Assigned role: worker. Read the Shared contract and worker section in /home/node/.pi/agent/roles/specialists.md before work. Read the rtk skill before direct RTK commands. Perform only the approved bounded task and targeted checks. Do not delegate."]
+      },
+      "pi-reviewer": {
+        "extends": "pi", "label": "reviewer",
+        "command": ["pi", "--no-extensions", "--extension", "/opt/toolchain/apps/node_modules/@ff-labs/pi-fff/src/index.ts", "--fff-mode", "tools-only", "--tools", "read,grep,find,ls,fffind,ffgrep", "--skill", "/home/node/.agents/skills/ponytail", "--skill", "/home/node/.agents/skills/code-review-pyramid", "--append-system-prompt", "Assigned role: reviewer. Read the Shared contract and reviewer section in /home/node/.pi/agent/roles/specialists.md before work. Read ponytail and code-review-pyramid for review. Inspect the approved revision and diff. Remain read-only. Do not delegate."]
+      },
+      "pi-oracle": {
+        "extends": "pi", "label": "oracle",
+        "command": ["pi", "--no-extensions", "--extension", "/opt/toolchain/apps/node_modules/@ff-labs/pi-fff/src/index.ts", "--fff-mode", "tools-only", "--tools", "read,grep,find,ls,fffind,ffgrep", "--skill", "/home/node/.agents/skills/ponytail", "--append-system-prompt", "Assigned role: oracle. Read the Shared contract and oracle section in /home/node/.pi/agent/roles/specialists.md before work. Read ponytail for simplification analysis. Remain read-only. Do not delegate."]
+      },
+      "pi-worker-recovery": {
+        "extends": "pi", "label": "worker-recovery",
+        "command": ["pi", "--no-extensions", "--extension", "/opt/toolchain/apps/node_modules/@ff-labs/pi-fff/src/index.ts", "--extension", "/opt/toolchain/apps/node_modules/pi-lens/dist/index.js", "--fff-mode", "tools-only", "--tools", "read,grep,find,ls,fffind,ffgrep,edit,write,bash,lens_diagnostics,symbol_search,effective_config,project_report,module_report,read_symbol,read_enclosing,pi_lens_activate_tools,ast_grep_search,ast_grep_replace,ast_grep_outline,lsp_navigation,lens_diagnostic_mark", "--skill", "/home/node/.agents/skills/ponytail", "--skill", "/home/node/.agents/skills/rtk", "--skill", "/opt/toolchain/apps/node_modules/pi-lens/skills", "--append-system-prompt", "Assigned role: worker-recovery. Read the Shared contract and worker-recovery section in /home/node/.pi/agent/roles/specialists.md before work. Read the attempt record and oracle diagnosis. Read ponytail and rtk when applicable. Perform only approved recovery changes and targeted checks. Do not delegate."]
+      }
+    }
+  }
+}

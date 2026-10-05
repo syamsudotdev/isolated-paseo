@@ -7,7 +7,7 @@ export function assess(agent, entries, now, complete = true) {
   const turn = agent.activeTurn;
   const started = Date.parse(turn?.startedAt);
   const result = { id: agent.id, turnId: turn?.turnId, status: agent.status,
-    role: agent.labels?.['paseo-slim.role'] ?? 'Unknown',
+    role: agent.labels?.['paseo.role'] ?? 'Unknown',
     title: agent.title ?? 'Unknown', agent: agent.provider ?? 'Unknown',
     model: agent.runtimeInfo?.model ?? agent.model ?? 'Unknown',
     startedAt: started, lastOutputAt: null, tools: [], suspectedStall: false,
