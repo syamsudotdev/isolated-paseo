@@ -6,6 +6,14 @@
     "@getpaseo/cli": "0.10.3",
     "@earendil-works/pi-coding-agent": "1.0.2",
     "@ff-labs/pi-fff": "0.11.0",
-    "figma-developer-mcp": "0.13.2"
+    "@ast-grep/cli": "0.45.3",
+    "bash-language-server": "5.8.1",
+    "figma-developer-mcp": "0.13.2",
+    "pi-lens": "4.3.0",
+    "pyright": "1.1.414",
+    "typescript": "7.0.2",
+    "typescript-language-server": "6.0.1",
+    "vscode-langservers-extracted": "4.10.0",
+    "yaml-language-server": "1.24.0"
   }
 }

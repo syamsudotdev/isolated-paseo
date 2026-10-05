@@ -20,8 +20,9 @@ ENV HOME=/home/node \
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     bash ca-certificates curl git jq openssh-client procps=2:4.0.2-3 build-essential tini unzip \
+    libedit2 libffi8 libxml2 libz3-4 libzstd1 zlib1g \
     && rm -rf /var/lib/apt/lists/* \
-    && mkdir -p /opt/toolchain/bin /opt/toolchain/mise /opt/toolchain/apps /opt/toolchain/rustup /opt/toolchain/cargo \
+    && mkdir -p /opt/toolchain/bin /opt/toolchain/mise /opt/toolchain/apps /opt/toolchain/language-servers /opt/toolchain/rustup /opt/toolchain/cargo \
       /opt/toolchain/android-sdk /home/node/.paseo /home/node/.pi/agent \
       /home/node/.agents/skills /home/node/.cache /home/node/.gradle/init.d \
       /home/node/.local/share/toolchain/cargo /home/node/.local/share/toolchain/android \
@@ -42,6 +43,7 @@ RUN chmod 755 /opt/toolchain/scripts/*.sh \
     && ln -s /opt/toolchain/scripts/android.sh /opt/toolchain/mise/installs/android-cli/1.0.16500706/android \
     && ln -s /opt/toolchain/scripts/android.sh /opt/toolchain/bin/android
 RUN /opt/toolchain/bin/mise -C /opt/toolchain exec -- sh -c 'cd /opt/toolchain/apps && npm ci --omit=dev --no-audit --no-fund' \
+    && /opt/toolchain/scripts/install-language-servers.sh \
     && /opt/toolchain/bin/mise -C /opt/toolchain run android-sdk \
     && rm -rf /home/node/.cache/*
 COPY defaults/ /opt/toolchain/defaults/

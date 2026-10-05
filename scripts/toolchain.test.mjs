@@ -19,6 +19,92 @@ test('FFF uses the pinned Pi extension rather than nonexistent command binaries'
   assert.ok(settings.extensions.includes('/opt/toolchain/apps/node_modules/@ff-labs/pi-fff/src/index.ts'));
 });
 
+test('pi-lens and language servers use reviewed immutable pins', async () => {
+  const apps = JSON.parse(await read('defaults/apps/package.json'));
+  const lock = JSON.parse(await read('defaults/apps/package-lock.json'));
+  const settings = JSON.parse(await read('defaults/pi/settings.json'));
+  const dockerfile = await read('Dockerfile');
+  const installer = await read('scripts/install-language-servers.sh');
+  const npmPins = {
+    'pi-lens': '4.3.0',
+    'typescript-language-server': '6.0.1',
+    typescript: '7.0.2',
+    pyright: '1.1.414',
+    'bash-language-server': '5.8.1',
+    'yaml-language-server': '1.24.0',
+    'vscode-langservers-extracted': '4.10.0',
+    '@ast-grep/cli': '0.45.3',
+  };
+  for (const [name, version] of Object.entries(npmPins)) {
+    assert.equal(apps.dependencies[name], version);
+    assert.equal(lock.packages[`node_modules/${name}`].version, version);
+  }
+  assert.ok(settings.packages.includes('/opt/toolchain/apps/node_modules/pi-lens'), 'Load both extension and skills through Pi local-package discovery');
+  assert.match(dockerfile, /install-language-servers\.sh/);
+  for (const library of ['libedit2', 'libffi8', 'libxml2', 'libz3-4', 'libzstd1', 'zlib1g']) assert.ok(dockerfile.includes(library), `Install clangd runtime dependency ${library} before pinned packages`);
+  for (const pin of ['23.1.2', '2026-02-08', '0.10.0', '2026-09-28', '1.61.0', '263.6379.0', 'v1.30.0', 'v0.1.56']) assert.ok(installer.includes(pin), `Missing native pin ${pin}`);
+  assert.match(installer, /jdtls\/bin\/jdtls --jvm-arg="-Duser\.home=\$HOME"/, 'Keep JDTLS Java home and Equinox state in writable HOME storage');
+  assert.match(installer, /intellij-server --stdio/, 'Use the image-owned Kotlin standard input and output wrapper');
+  assert.match(installer, /scripts\/typescript-language-server\.sh/, 'Route the global fallback through native TypeScript 7');
+  assert.equal((installer.match(/tar --no-same-owner/g) ?? []).length, 3, 'Extract native archives with image ownership under rootless Docker');
+  assert.ok(!installer.includes('apt-get'), 'Do not add an APT repository or force dependency installation');
+  assert.match(installer, /sha256sum -c -/);
+});
+
+test('TypeScript launcher selects the native language server and preserves arguments', async () => {
+  const temp = await mkdtemp(join(tmpdir(), 'paseo-typescript-wrapper-'));
+  try {
+    const tsc = join(temp, 'apps/node_modules/.bin/tsc');
+    const classic = join(temp, 'apps/node_modules/.bin/typescript-language-server');
+    await mkdir(dirname(tsc), { recursive: true });
+    await writeFile(tsc, `#!${process.execPath}\nconsole.log(JSON.stringify(process.argv.slice(2)));\n`, { mode: 0o755 });
+    await writeFile(classic, `#!${process.execPath}\nconsole.log('6.0.1');\n`, { mode: 0o755 });
+    const wrapper = join(temp, 'typescript-language-server.sh');
+    await writeFile(wrapper, (await read('scripts/typescript-language-server.sh')).replaceAll('/opt/toolchain', temp), { mode: 0o755 });
+    const result = spawnSync(wrapper, ['--stdio', '--log-level', '4'], { encoding: 'utf8', timeout: 5000 });
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(JSON.parse(result.stdout), ['--lsp', '--stdio', '--log-level', '4']);
+    const version = spawnSync(wrapper, ['--version'], { encoding: 'utf8', timeout: 5000 });
+    assert.equal(version.status, 0, version.stderr);
+    assert.equal(version.stdout, '6.0.1\n');
+  } finally { await rm(temp, { recursive: true, force: true }); }
+});
+
+test('JDTLS launcher selects writable Java home and preserves arguments', async () => {
+  const temp = await mkdtemp(join(tmpdir(), 'paseo-jdtls-wrapper-'));
+  try {
+    const server = join(temp, 'language-servers/jdtls/bin/jdtls');
+    const home = join(temp, 'home');
+    await mkdir(dirname(server), { recursive: true });
+    await writeFile(server, `#!${process.execPath}\nconsole.log(JSON.stringify({ args: process.argv.slice(2), home: process.env.HOME }));\n`, { mode: 0o755 });
+    const installer = await read('scripts/install-language-servers.sh');
+    const wrapperSource = installer.match(/cat > "\$bin\/jdtls" <<'EOF'\n([\s\S]*?)\nEOF/)?.[1];
+    assert.ok(wrapperSource, 'Installer must contain the JDTLS wrapper body');
+    const wrapper = join(temp, 'jdtls');
+    await writeFile(wrapper, wrapperSource.replaceAll('/opt/toolchain', temp), { mode: 0o755 });
+    const result = spawnSync(wrapper, ['-data', 'a path with spaces'], { encoding: 'utf8', timeout: 5000, env: { ...process.env, HOME: home } });
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(JSON.parse(result.stdout), { args: [`--jvm-arg=-Duser.home=${home}`, '-data', 'a path with spaces'], home });
+  } finally { await rm(temp, { recursive: true, force: true }); }
+});
+
+test('Kotlin launcher selects standard input and output transport and preserves arguments', async () => {
+  const temp = await mkdtemp(join(tmpdir(), 'paseo-kotlin-wrapper-'));
+  try {
+    const server = join(temp, 'language-servers/kotlin-lsp/bin/intellij-server');
+    await mkdir(dirname(server), { recursive: true });
+    await writeFile(server, `#!${process.execPath}\nconsole.log(JSON.stringify(process.argv.slice(2)));\n`, { mode: 0o755 });
+    const wrapper = join(temp, 'kotlin-lsp');
+    const installer = await read('scripts/install-language-servers.sh');
+    const wrapperSource = installer.match(/cat > "\$bin\/kotlin-lsp" <<'EOF'\n([\s\S]*?)\nEOF/)?.[1];
+    assert.ok(wrapperSource, 'Installer must contain the Kotlin wrapper body');
+    await writeFile(wrapper, wrapperSource.replaceAll('/opt/toolchain', temp), { mode: 0o755 });
+    const result = spawnSync(wrapper, ['--system-path', 'a path with spaces'], { encoding: 'utf8', timeout: 5000 });
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(JSON.parse(result.stdout), ['--stdio', '--system-path', 'a path with spaces']);
+  } finally { await rm(temp, { recursive: true, force: true }); }
+});
+
 test('Android entry points verify the full payload and use the no-metrics wrapper', async t => {
   const dockerfile = await read('Dockerfile');
   const payload = `#!${process.execPath}\nconsole.log(JSON.stringify(process.argv.slice(2)));\n`;
@@ -117,8 +203,10 @@ test('Rust launchers align with writable Cargo storage without replacing user fi
         if (scenario === 'dangling symlink conflict') await symlink(join(temp, 'missing-user-tool'), conflict);
         const entrypoint = join(temp, 'entrypoint.sh');
         await writeFile(entrypoint, (await read('scripts/entrypoint.sh')).replaceAll('/opt/toolchain', image).replaceAll('/home/node', home));
-        const run = () => spawnSync('bash', [entrypoint, 'true'], { encoding: 'utf8', timeout: 5000 });
+        const config = join(temp, 'config');
+        const run = () => spawnSync('bash', [entrypoint, 'true'], { env: { ...process.env, XDG_CONFIG_HOME: config }, encoding: 'utf8', timeout: 5000 });
         const result = run();
+        assert.ok((await lstat(config)).isDirectory(), 'The configuration directory must stay inside the disposable fixture');
         if (scenario.includes('conflict')) {
           assert.notEqual(result.status, 0, 'A conflicting launcher must stop initialization');
           assert.match(result.stderr, /Rust launcher conflict:/);
@@ -147,6 +235,7 @@ test('concurrent entrypoints serialize initialization and release the lock befor
     const image = join(temp, 'toolchain');
     const home = join(temp, 'home');
     const agent = join(temp, 'agent');
+    const config = join(temp, 'config');
     for (const path of [join(image, 'bin'), join(image, 'scripts'), join(image, 'cargo/bin'), agent]) await mkdir(path, { recursive: true });
     for (const name of ['cargo', 'rustc', 'rustup']) await writeFile(join(image, 'cargo/bin', name), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
     const settings = '{"defaultModel":"custom"}\n';
@@ -165,12 +254,13 @@ test('concurrent entrypoints serialize initialization and release the lock befor
     await writeFile(runner, `#!/bin/bash\nset -eu\nmkfifo '${temp}/events' '${temp}/release' '${temp}/daemon-started' '${temp}/daemon-release'\nINIT_FIRST=1 bash '${entrypoint}' bash -c '${command}' > '${temp}/first.log' 2>&1 &\nfirst=$!\nIFS= read -r event < '${temp}/events'\ntest "$event" = entered\nINIT_FIRST=0 bash '${entrypoint}' bash -c '${command}' > '${temp}/second.log' 2>&1 &\nsecond=$!\nIFS= read -r event < '${temp}/events'\nprintf 'release\\n' > '${temp}/release'\nIFS= read -r command_state < '${temp}/daemon-started'\ntest "$command_state" = running\nset +e\nwait "$second"; second_status=$?\n/usr/bin/flock --nonblock '${home}/.local/share/toolchain/initialization.lock' true; lock_status=$?\nprintf 'release\\n' > '${temp}/daemon-release'\nwait "$first"; first_status=$?\nset -e\nprintf 'event=%s first=%s second=%s lock=%s\\n' "$event" "$first_status" "$second_status" "$lock_status"\ntest "$event" = lock-request\ntest "$first_status" = 0\ntest "$second_status" = 0\ntest "$lock_status" = 0\n`);
     const result = spawnSync('timeout', ['10s', 'bash', runner], {
       encoding: 'utf8', timeout: 15000,
-      env: { ...process.env, DEFAULTS_DIR: join(root, 'defaults'), PI_AGENT_DIR: agent, SKILLS_DIR: join(temp, 'skills'), GRADLE_DIR: join(temp, 'gradle') },
+      env: { ...process.env, XDG_CONFIG_HOME: config, DEFAULTS_DIR: join(root, 'defaults'), PI_AGENT_DIR: agent, SKILLS_DIR: join(temp, 'skills'), GRADLE_DIR: join(temp, 'gradle') },
     });
     assert.equal(result.status, 0, result.stdout + result.stderr);
     assert.equal(result.stdout, 'event=lock-request first=0 second=0 lock=0\n', 'Initialization must be serialized, while a running command must not retain the lock');
     assert.equal(await readFile(join(agent, 'settings.json'), 'utf8'), settings);
     assert.equal(await readFile(join(agent, 'mcp.json'), 'utf8'), mcp);
+    assert.ok((await lstat(config)).isDirectory(), 'Startup must create the configured writable configuration directory');
     assert.equal(await readFile(join(temp, 'skills/android-cli/SKILL.md'), 'utf8'), await read('defaults/skills/android-cli/SKILL.md'));
     for (const name of ['cargo', 'rustc', 'rustup']) assert.equal(await readlink(join(home, '.local/share/toolchain/cargo/bin', name)), join(image, 'cargo/bin', name));
   } finally { await rm(temp, { recursive: true, force: true }); }

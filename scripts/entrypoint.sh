@@ -7,7 +7,7 @@ export CARGO_HOME=/home/node/.local/share/toolchain/cargo RUSTUP_HOME=/opt/toolc
 export GOPATH=/home/node/.local/share/toolchain/go GOCACHE=/home/node/.cache/toolchain/go UV_CACHE_DIR=/home/node/.cache/toolchain/uv
 export LANG=C.UTF-8 LC_ALL=C.UTF-8
 export PATH=/opt/toolchain/bin:/opt/toolchain/apps/node_modules/.bin:/opt/toolchain/android-sdk/platform-tools:/opt/toolchain/android-sdk/cmdline-tools/23.0/bin:/opt/toolchain/android-sdk/build-tools/37.0.0:$PATH
-mkdir -p "$MISE_CACHE_DIR" "$ANDROID_USER_HOME" "$CARGO_HOME" "$GOPATH" "$GOCACHE" "$UV_CACHE_DIR"
+mkdir -p "$XDG_CONFIG_HOME" "$MISE_CACHE_DIR" "$ANDROID_USER_HOME" "$CARGO_HOME" "$GOPATH" "$GOCACHE" "$UV_CACHE_DIR"
 # Serialize entrypoint initialization; manual edits and direct initializer calls do not use this lock.
 # The subshell closes the lock descriptor before daemon execution.
 (
