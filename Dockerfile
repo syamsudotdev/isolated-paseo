@@ -35,13 +35,21 @@ RUN /opt/toolchain/bin/mise -C /opt/toolchain install --jobs 3
 COPY defaults/apps/package.json defaults/apps/package-lock.json /opt/toolchain/apps/
 COPY scripts/ /opt/toolchain/scripts/
 RUN chmod 755 /opt/toolchain/scripts/*.sh \
+    && mv /opt/toolchain/mise/installs/android-cli/1.0.16500706/android /opt/toolchain/mise/installs/android-cli/1.0.16500706/android.launcher \
+    && curl -fsSL --compressed https://dl.google.com/android/cli/1.0.16500706/linux_x86_64/android-cli -o /opt/toolchain/mise/installs/android-cli/1.0.16500706/android.real \
+    && echo '508840c2a9ce8768a9246ec7962834713967b46dd0cf0dad80fcde3d444947c0  /opt/toolchain/mise/installs/android-cli/1.0.16500706/android.real' | sha256sum -c - \
+    && chmod 755 /opt/toolchain/mise/installs/android-cli/1.0.16500706/android.real \
+    && ln -s /opt/toolchain/scripts/android.sh /opt/toolchain/mise/installs/android-cli/1.0.16500706/android \
     && ln -s /opt/toolchain/scripts/android.sh /opt/toolchain/bin/android
 RUN /opt/toolchain/bin/mise -C /opt/toolchain exec -- sh -c 'cd /opt/toolchain/apps && npm ci --omit=dev --no-audit --no-fund' \
-    && /opt/toolchain/bin/mise -C /opt/toolchain exec -- sh -c \
-      'yes | sdkmanager --sdk_root=/opt/toolchain/android-sdk "platform-tools" "platforms;android-37.2" "build-tools;37.0.0"' \
+    && /opt/toolchain/bin/mise -C /opt/toolchain run android-sdk \
     && rm -rf /home/node/.cache/*
 COPY defaults/ /opt/toolchain/defaults/
-RUN chown -R 0:0 /home/node
+# Startup initializes these launchers in writable Cargo storage before mise checks Rust.
+RUN ln -sfnT /home/node/.local/share/toolchain/cargo/bin /opt/toolchain/mise/installs/rust/1.99.0 \
+    && chown -R 0:0 /home/node
+ENV CARGO_HOME=/home/node/.local/share/toolchain/cargo \
+    PATH=/opt/toolchain/bin:/opt/toolchain/apps/node_modules/.bin:/opt/toolchain/android-sdk/platform-tools:/opt/toolchain/android-sdk/cmdline-tools/23.0/bin:/opt/toolchain/android-sdk/build-tools/37.0.0:$PATH
 USER root
 WORKDIR /workspace
 ENTRYPOINT ["/usr/bin/tini", "--", "/opt/toolchain/scripts/entrypoint.sh"]

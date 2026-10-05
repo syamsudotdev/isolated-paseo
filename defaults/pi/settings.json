@@ -1,5 +1,6 @@
 {
   "defaultProvider": "openai",
   "defaultModel": "gpt-6.1-sol",
-  "defaultThinkingLevel": "medium"
+  "defaultThinkingLevel": "medium",
+  "extensions": ["/opt/toolchain/apps/node_modules/@ff-labs/pi-fff/src/index.ts"]
 }

@@ -37,6 +37,10 @@ tool sh -c 'grep -qx "Pkg.Revision=37.0.1" "$ANDROID_HOME/platform-tools/source.
 [[ "$(tool az version --output json | docker compose exec -T paseo node -e 'let s="";process.stdin.on("data",c=>s+=c).on("end",()=>console.log(JSON.parse(s)["azure-cli"]))')" == 2.90.0 ]]
 [[ "$(tool fd --version)" == 'fd 10.5.0' ]]
 [[ "$(tool rg --version)" == 'ripgrep 15.2.0'* ]]
+[[ "$(tool rtk --version)" == 'rtk 0.51.0'* ]]
+[[ "$(tool node -p 'require("/opt/toolchain/apps/node_modules/@ff-labs/pi-fff/package.json").version')" == 0.11.0 ]]
+[[ "$(tool android --version)" == 1.0.16500706 ]]
+tool sh -c 'test "$(readlink /opt/toolchain/mise/installs/android-cli/1.0.16500706/android)" = /opt/toolchain/scripts/android.sh'
 docker compose exec -T paseo sh -c 'for path in /home/node /home/node/.cache /home/node/.pi/agent /home/node/.paseo /workspace; do test -w "$path" || exit 1; done'
 docker compose exec -T paseo sh -c 'test -d "$HOME/.gradle" && test -w "$HOME/.gradle" && test -f "$HOME/.gradle/gradle.properties" && test -r "$HOME/.gradle/gradle.properties"'
 docker compose exec -T paseo sh -c 'test -d "$HOME/.gradle/init.d" && test -w "$HOME/.gradle/init.d" && test -f "$HOME/.gradle/init.d/test-forks.gradle" && test -r "$HOME/.gradle/init.d/test-forks.gradle"'
@@ -56,12 +60,13 @@ process.stdin.on("end", () => {
     binds[target] = mount.source;
   }
   const home = service.volumes.find(m => m.target === "/home/node");
-  if (service.volumes.length !== 5 || home?.type !== "volume" || home.source !== "paseo_home" || home.volume?.nocopy) throw new Error("Invalid home volume or mount scope");
-  const secrets = service.secrets || [];
-  if (secrets.length !== 2 || !["figma-workplace-a", "figma-workplace-b"].every(name => secrets.some(s => s.target === name))) throw new Error("Unexpected secrets");
+  if (service.volumes.length !== 6 || home?.type !== "volume" || home.source !== "paseo_home" || home.volume?.nocopy) throw new Error("Invalid home volume or mount scope");
+  const figma = service.volumes.find(m => m.target === "/run/secrets/figma");
+  if (figma?.type !== "bind" || !figma.source || !figma.read_only || figma.bind?.create_host_path !== false) throw new Error("Invalid Figma directory mount");
+  if (service.secrets?.length) throw new Error("Unexpected per-account secrets");
   const daemon = service.ports.find(p => p.target === 6767);
   if (!daemon?.published) throw new Error("Missing daemon port");
-  console.log(JSON.stringify({ binds, home: config.volumes.paseo_home.name, port: String(daemon.published) }));
+  console.log(JSON.stringify({ binds, figma: figma.source, home: config.volumes.paseo_home.name, port: String(daemon.published) }));
 });')
 
 docker inspect "$container" | docker compose exec -T -e SMOKE_EXPECTED="$expected" paseo node -e '
@@ -95,11 +100,9 @@ process.stdin.on("end", () => {
     const mount = c.Mounts.find(m => m.Destination === target);
     check(mount?.Type === "bind" && mount.RW && mount.Source === source, "Unexpected bind: " + target);
   }
-  for (const name of ["figma-workplace-a", "figma-workplace-b"]) {
-    const mount = c.Mounts.find(m => m.Destination === "/run/secrets/" + name);
-    check(mount?.Type === "bind" && !mount.RW, "Invalid secret mount: " + name);
-  }
-  const targets = ["/home/node", ...Object.keys(expected.binds), "/tmp", "/run", "/run/secrets/figma-workplace-a", "/run/secrets/figma-workplace-b"];
+  const figma = c.Mounts.find(m => m.Destination === "/run/secrets/figma");
+  check(figma?.Type === "bind" && !figma.RW && figma.Source === expected.figma, "Invalid Figma directory mount");
+  const targets = ["/home/node", ...Object.keys(expected.binds), "/tmp", "/run", "/run/secrets/figma"];
   check(c.Mounts.every(m => targets.includes(m.Destination)), "Unexpected mount destination");
   check(Object.keys(h.Tmpfs || {}).length === 2, "Unexpected tmpfs mounts");
   for (const target of ["/tmp", "/run"]) {
@@ -110,6 +113,19 @@ process.stdin.on("end", () => {
   }
   console.log("Container isolation checks passed.");
 });'
+
+docker compose exec -T paseo node -e '
+// Check Figma file permissions without reading credentials.
+const { lstatSync, readdirSync } = require("node:fs");
+const { join } = require("node:path");
+const directory = process.argv[1];
+const stat = lstatSync(directory);
+if (!stat.isDirectory() || (stat.mode & 0o777) !== 0o700) throw new Error("Figma directory must have mode 0700");
+for (const name of readdirSync(directory)) {
+  const file = lstatSync(join(directory, name));
+  if (!file.isFile() || (file.mode & 0o777) !== 0o600) throw new Error("Figma directory must contain only regular files with mode 0600");
+}
+console.log("Figma file permission checks passed.");' /run/secrets/figma
 
 docker compose exec -T paseo node -e '
 fetch("http://127.0.0.1:6767/", { signal: AbortSignal.timeout(10000) })

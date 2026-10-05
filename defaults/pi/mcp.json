@@ -1,14 +1,3 @@
 {
-  "mcpServers": {
-    "framelink-mcp-workplace-a": {
-      "command": "figma-developer-mcp",
-      "args": ["--stdio", "--no-telemetry", "--skip-image-downloads", "--env", "/run/secrets/figma-workplace-a"],
-      "description": "Read Figma design data using the workplace A account."
-    },
-    "framelink-mcp-workplace-b": {
-      "command": "figma-developer-mcp",
-      "args": ["--stdio", "--no-telemetry", "--skip-image-downloads", "--env", "/run/secrets/figma-workplace-b"],
-      "description": "Read Figma design data using the workplace B account."
-    }
-  }
+  "mcpServers": {}
 }

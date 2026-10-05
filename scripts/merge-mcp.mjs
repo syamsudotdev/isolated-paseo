@@ -18,7 +18,7 @@ if (current.mcpServers != null && (typeof current.mcpServers !== 'object' || Arr
   throw new Error('Invalid existing MCP server configuration.');
 }
 const servers = { ...current.mcpServers };
-let changed = false;
+let changed = current.mcpServers == null;
 for (const [name, value] of Object.entries(defaults.mcpServers)) {
   if (!Object.hasOwn(servers, name)) { servers[name] = value; changed = true; }
 }

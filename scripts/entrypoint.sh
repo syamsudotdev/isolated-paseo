@@ -8,7 +8,27 @@ export GOPATH=/home/node/.local/share/toolchain/go GOCACHE=/home/node/.cache/too
 export LANG=C.UTF-8 LC_ALL=C.UTF-8
 export PATH=/opt/toolchain/bin:/opt/toolchain/apps/node_modules/.bin:/opt/toolchain/android-sdk/platform-tools:/opt/toolchain/android-sdk/cmdline-tools/23.0/bin:/opt/toolchain/android-sdk/build-tools/37.0.0:$PATH
 mkdir -p "$MISE_CACHE_DIR" "$ANDROID_USER_HOME" "$CARGO_HOME" "$GOPATH" "$GOCACHE" "$UV_CACHE_DIR"
-# mise exec applies configured tools to initialization, the daemon, and its agent children.
-/opt/toolchain/bin/mise -C /opt/toolchain exec -- /opt/toolchain/scripts/init-defaults.sh
+# Serialize entrypoint initialization; manual edits and direct initializer calls do not use this lock.
+# The subshell closes the lock descriptor before daemon execution.
+(
+	/usr/bin/flock --exclusive 9
+	# Validate all existing entries before creating image-owned Rust launcher links.
+	mkdir -p "$CARGO_HOME/bin"
+	for source in /opt/toolchain/cargo/bin/*; do
+		launcher="$CARGO_HOME/bin/${source##*/}"
+		if [[ -e "$launcher" || -L "$launcher" ]]; then
+			if [[ ! -L "$launcher" || "$(readlink -- "$launcher")" != "$source" ]]; then
+				printf 'Rust launcher conflict: %s\n' "$launcher" >&2
+				exit 1
+			fi
+		fi
+	done
+	for source in /opt/toolchain/cargo/bin/*; do
+		launcher="$CARGO_HOME/bin/${source##*/}"
+		if [[ ! -e "$launcher" && ! -L "$launcher" ]]; then ln -s -- "$source" "$launcher"; fi
+	done
+	# mise exec applies configured tools to initialization, the daemon, and its agent children.
+	/opt/toolchain/bin/mise -C /opt/toolchain exec -- /opt/toolchain/scripts/init-defaults.sh
+) 9>>"$HOME/.local/share/toolchain/initialization.lock"
 # shellcheck disable=SC2016 # Expand the child PATH in the child shell.
 exec /opt/toolchain/bin/mise -C /opt/toolchain exec -- bash -c 'export PATH=/opt/toolchain/bin:$PATH; exec "$@"' bash "$@"

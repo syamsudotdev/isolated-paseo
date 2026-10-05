@@ -15,8 +15,12 @@ android-cli = "1.0.16500706"
 android-sdk = "23.0"
 # Adoptium maps 25.0.4+101.0.LTS to OpenJDK 25.0.4.1+1-LTS.
 
+[env]
+ANDROID_HOME = "/opt/toolchain/android-sdk"
+ANDROID_CLI_DOWNLOAD_URL = "https://dl.google.com/android/cli/1.0.16500706/linux_x86_64/android-cli"
+
 [tasks.apps]
 run = "cd /opt/toolchain/apps && npm ci --omit=dev"
 
 [tasks.android-sdk]
-run = "yes | sdkmanager --sdk_root=/opt/toolchain/android-sdk 'platform-tools' 'platforms;android-37.2' 'build-tools;37.0.0'"
+run = "sh -c \"yes | android --sdk=/opt/toolchain/android-sdk sdk install 'platforms/android-37.2@1' && yes | android --sdk=/opt/toolchain/android-sdk sdk install 'build-tools/37.0.0@37.0.0'\" && /opt/toolchain/scripts/install-platform-tools.sh"
