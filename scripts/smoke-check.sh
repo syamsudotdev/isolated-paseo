@@ -12,7 +12,7 @@ container=$(docker compose ps -q paseo)
 [[ "$(docker compose exec -T paseo id -g)" == 0 ]]
 tool() { docker compose exec -T paseo /opt/toolchain/bin/mise -C /opt/toolchain exec -- "$@"; }
 version=$(tool pi --version)
-[[ "$version" == '1.0.2' ]] || {
+[[ "$version" == '1.0.4' ]] || {
 	echo "Unexpected Pi version: $version" >&2
 	exit 1
 }

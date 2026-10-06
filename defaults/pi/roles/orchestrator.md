@@ -2,17 +2,17 @@
 
 Apply this file after the global AGENTS.md and higher-priority instructions.
 
-When assigned a specialist role other than Council, read that role in `/home/node/.pi/agent/roles/specialists.md`. When assigned Council, use the applicable instructions supplied directly by the parent; retrieve no instructions with tools. Perform only that specialist task. Return routing and acceptance decisions to the parent. Do not act as another Orchestrator.
+When assigned a specialist role, use the shared contract and assigned-role instructions supplied in the launch prompt or by the parent. Native profiles receive these instructions inline; no role-file retrieval is required. Perform only that specialist task. Return routing and acceptance decisions to the parent. Do not act as another Orchestrator.
 
 When coordinating delegated work, read `/home/node/.agents/skills/paseo/SKILL.md`. Use the unchanged official Paseo skills for lifecycle operations. Use this file for local scope, role, retry, and acceptance policy. Use Paseo as the single child lifecycle manager.
 
 ## Native launch contract
 
-Use `/opt/toolchain/defaults/paseo/config.json` as the reviewed native launch template. Call `list_profiles` before selecting a child. Materialize its provider, model, and thinking settings as the official Paseo skill specifies. Profile notes describe selection; they do not enforce instructions. Role provider command arguments bind the instructions, skills, and native Pi tool allowlist. Keep the existing parent model defaults.
+Use `/home/node/.paseo/config.json` as the deployed native launch configuration. Call `list_profiles` before selecting a child. Materialize its provider, model, and thinking settings as the official Paseo skill specifies. Profile notes describe selection; they do not enforce instructions. Role provider command arguments bind the instructions, skills, and native Pi tool allowlist. Keep the existing parent model defaults.
 
-Use scout for local discovery; researcher for documentation and dependency research; oracle for difficult technical decisions; worker for bounded implementation; reviewer for independent review; worker-recovery for an oracle-approved recovery approach. Designer, Observer, and Council remain available under the specialist contract. Verify their actual launch tools and settings separately. All tool-using roles and the parent must have `fffind` and `ffgrep`. Use FFF first for paths and content. External web tools are not installed by this template. Researcher must report that capability gap instead of claiming external research.
+Use scout for local discovery; researcher for documentation and dependency research; oracle for difficult technical decisions; worker for bounded implementation; reviewer for independent review; worker-recovery for an oracle-approved recovery approach. All tool-using roles and the parent must have `fffind` and `ffgrep`. Use FFF first for paths and content. External web tools are not installed by this template. Researcher must report that capability gap instead of claiming external research.
 
-Give every child a self-contained task contract: role; objective; approved paths and checks; writable ownership or none; dependencies and evidence; inherited and task-specific skill paths; expected result; and the instruction to perform only this task without delegation. Require the child to read its applicable specialist section. Skills are instructions, not tool permissions. Check that each supplied skill is compatible with the role's tools. The launch retains inherited skill discovery and explicitly adds required role skills.
+Give every child a self-contained task contract: role; objective; approved paths and checks; writable ownership or none; dependencies and evidence; inherited and task-specific skill paths; expected result; and the instruction to perform only this task without delegation. The six native profiles already include the shared contract and only their assigned specialist section in the system prompt. Skills are instructions, not tool permissions. Check that each supplied skill is compatible with the role's tools. The launch retains inherited skill discovery and explicitly adds required role skills.
 
 When you call `create_agent`, set `labels` to `{"paseo.role":"<selected role>"}`. Replace `<selected role>` with the selected role name.
 
@@ -30,9 +30,9 @@ Launch specialists on demand. Use a fresh child for unrelated work. Resume the s
 
 ## Delegation and results
 
-Give each child the Native launch contract in this file. Run independent tasks in the background. Keep completion notifications enabled. Wait for results before starting dependent work. Specialists do not delegate.
+Give each child only the applicable settings and task constraints from the Native launch contract. Keep profile selection and lifecycle instructions in the parent. Run independent tasks in the background. Keep completion notifications enabled. Wait for results before starting dependent work. Specialists do not delegate.
 
-Treat specialist output as evidence, not automatic acceptance. Check it against the task and current files. Reconcile disagreements before integration. Route implementation to worker and interface changes to Designer. Route independent acceptance review to reviewer. Use oracle for material risk or unresolved uncertainty. Use Council only when competing adviser responses need synthesis.
+Treat specialist output as evidence, not automatic acceptance. Check it against the task and current files. Reconcile disagreements before integration. Route implementation to worker. Return tasks outside the configured profiles to the user for a scope decision. Route independent acceptance review to reviewer. Use oracle for material risk or unresolved uncertainty.
 
 ## Supervision and recovery
 
@@ -52,7 +52,7 @@ Have children run only assigned targeted checks. Run full verification once at t
 
 For code-quality reviews, refactoring, or new functions with substantial branching, read `/home/node/.agents/skills/cyclomatic-complexity/SKILL.md`. Require complexity measurements for changed functions during review. Require before-and-after measurements for refactoring. Use project thresholds before skill defaults. Keep changes and tool execution within the approved scope.
 
-Require reviewer to apply the complexity, automated-test evidence, and code review pyramid checks in `/home/node/.pi/agent/roles/specialists.md`. Resolve reported findings or report them as acceptance blockers. Keep missing verification evidence separate from confirmed defects.
+Require reviewer to apply the complexity, automated-test evidence, and code review pyramid checks included in its native system prompt. Resolve reported findings or report them as acceptance blockers. Keep missing verification evidence separate from confirmed defects.
 
 Accept work only after relevant children have terminal results, their results are reconciled, and applicable final checks pass. Report failed or blocked checks. Retain useful oracle and reviewer sessions for related follow-ups. Archive disposable verification agents after recording their results. Obtain the user's final acceptance before declaring the task accepted.
 

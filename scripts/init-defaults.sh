@@ -10,6 +10,8 @@ for file in AGENTS.md settings.json; do
 done
 for dir in roles extensions supervision; do
 	while IFS= read -r -d '' file; do
+		# Keep test source out of the runtime agent directory.
+		if [[ "$file" == *.test.mjs ]]; then continue; fi
 		target="$agent_dir/$dir/${file##*/}"
 		if [[ ! -e "$target" && ! -L "$target" ]]; then cp "$file" "$target"; fi
 	done < <(find "$source_dir/pi/$dir" -maxdepth 1 -type f -print0)

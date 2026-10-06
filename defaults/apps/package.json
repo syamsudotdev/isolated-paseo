@@ -4,7 +4,8 @@
   "version": "1.0.0",
   "dependencies": {
     "@getpaseo/cli": "0.10.3",
-    "@earendil-works/pi-coding-agent": "1.0.2",
+    "@earendil-works/pi-coding-agent": "1.0.4",
+    "pi-mcp-adapter": "5.1.0",
     "@ff-labs/pi-fff": "0.11.0",
     "@ast-grep/cli": "0.45.3",
     "bash-language-server": "5.8.1",
